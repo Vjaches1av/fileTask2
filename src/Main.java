@@ -1,4 +1,5 @@
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.Scanner;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -7,35 +8,36 @@ public final class Main {
     private static int saveCounter = 0;
 
     private static void saveGame(GameProgress obj, File savePath) {
-        try (ObjectOutputStream out =
-                     new ObjectOutputStream(
-                             new FileOutputStream(
-                                     new File(savePath, "save" + ++saveCounter + ".dat"), false))) {
+        final File file = new File(savePath, "save" + ++saveCounter + ".dat");
+
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file, false))) {
             out.writeObject(obj);
         } catch (IOException e) {
-            System.err.println("Ошибка сохранения игры");
+            System.err.println("Ошибка сохранения файла " + file.getName());
         }
     }
 
     private static void zipFiles(File savePath, File... files) {
         if (files != null && files.length != 0) {
-            File file = new File(savePath, "archive.zip");
-            try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(file, false));
+            File zipFile = new File(savePath, "archive.zip");
+            try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(zipFile, false), Charset.forName("cp866"));
                  BufferedOutputStream fileOut = new BufferedOutputStream(zipOut)) {
                 for (File f : files) {
-                    int data;
-                    byte[] b = new byte[128];
-                    try (BufferedInputStream fileIn = new BufferedInputStream(new FileInputStream(f))) {
-                        zipOut.putNextEntry(new ZipEntry(f.getName()));
-                        while ((data = fileIn.read(b)) != -1)
-                            fileOut.write(b, 0, data);
-                        fileOut.flush();
-                        zipOut.closeEntry();
+                    if (f.isFile()) {
+                        int data;
+                        byte[] b = new byte[128];
+                        try (BufferedInputStream fileIn = new BufferedInputStream(new FileInputStream(f))) {
+                            zipOut.putNextEntry(new ZipEntry(f.getName()));
+                            while ((data = fileIn.read(b)) != -1)
+                                fileOut.write(b, 0, data);
+                            fileOut.flush();
+                            zipOut.closeEntry();
+                        }
                     }
                 }
             } catch (IOException e) {
                 System.err.println("Ошибка записи файлов в формат zip");
-                deleteFiles(file);
+                deleteFiles(zipFile);
             }
         }
     }
@@ -43,7 +45,7 @@ public final class Main {
     private static void deleteFiles(File... files) {
         if (files != null && files.length != 0) {
             for (File f : files) {
-                if (!f.delete()) {
+                if (f.exists() && !f.delete()) {
                     System.err.println("Ошибка при удалении файла " + f.getName());
                 }
             }
